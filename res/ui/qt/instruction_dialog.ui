@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>InstructionDialog</class>
+ <widget class="QDialog" name="InstructionDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>608</width>
+    <height>382</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>608</width>
+    <height>382</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>608</width>
+    <height>382</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>Интструкция</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QScrollArea" name="scrollArea">
+       <property name="widgetResizable">
+        <bool>true</bool>
+       </property>
+       <widget class="QWidget" name="scrollAreaWidgetContents">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>565</width>
+          <height>504</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="QLabel" name="lbl_instruction">
+           <property name="text">
+            <string>Общие ограничения:
+1. Переменные и ограничения находятся в диапазоне от 1 до 16.
+2. Число ограничений &lt; числа переменных.
+3. 0граничения на вводимые данные: с != 0, b &gt;= 0.
+
+Для начала работы с программой введите базовые условия задачи:
+1.  Число переменных
+2. Число ограничений
+3. Тип задачи (Минимум / Максимум)
+4. Выберите тип дробей
+5. Выберите сподоб решения
+6. Нажмите кнопку &quot;Далее&quot;
+7.  Введите матрицу задачи
+
+Далее перейдём к решению
+8. Нажмите кнопку &quot;Решить&quot;
+9. В зависимости от выбранного способа решения вы либо перейдёте в интерактивный режим либо получите ответ
+
+Для решения в интерактивном режиме необходимо выбирать подсвеченные опорные элеметны.
+
+Этапы решения:
+1. Метод искуственного базиса (может быть задан изначально)
+2. Решение задачи симплекс-методом
+3. Ответ
+
+Если поля базиса останутся не заполненными, то задача будет решена методом искусственного базиса
+При введении базиса решение перейдёт сразу на 2 этап.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="btn_instruction_close">
+       <property name="standardButtons">
+        <set>QDialogButtonBox::StandardButton::Close</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
