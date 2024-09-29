@@ -12,7 +12,10 @@ class SymplexStep:
 
 class SymplexLogic:
     def __init__(self):
-        self.steps = []
+        self.solution_type = None
+        self.extremum_type = None
+        # [ <массив шагов иск-го базиса>, <массив шагов симплекса>]
+        self.steps = [[], []]
 
     def gauss_method(self, matrix, target_columns):
         rows = len(matrix)
@@ -36,7 +39,7 @@ class SymplexLogic:
                         matrix[target_row][column] -= factor * matrix[row_index][column]
         return matrix
 
-    def reduced_function(self, function, gauss_matrix, basis, extremum_type):
+    def reduce_function(self, function, gauss_matrix, basis, extremum_type):
         # Инициализируем новую функцию с нулевыми коэффициентами для базисных переменных
         new_function = []
         for i in range(len(function)):
@@ -112,21 +115,12 @@ class SymplexLogic:
 
         return symplex_table
 
-    def artificial_basis_method(self):
-        pass
-
-    # st = symplex_table
-    def solve_task(self, st, extremum_type, solution_type):
-        self.steps = [st]
-
-
-
+    def symplex_method(self):
         while True:
-            old_st = self.steps[-1]
+            old_st = self.steps[1][-1]
             new_st = []
 
             # Делаем глубокую копию последней симплекс-таблицы
-            print('Симплекс-таблица:')
             for row in old_st:
                 new_st_row = []
                 for el in row:
@@ -143,9 +137,9 @@ class SymplexLogic:
             sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
 
             if len(sorted_available_col_coeffs) == 0:
-                print('Нет доступных столбцов для выбора, симплекс метод закончен!\n')
+                print('Нет доступных столбцов для выбора, симплекс-метод закончен!\n')
                 result = new_st[-1][-1]
-                if extremum_type == ExtremumType.MIN:
+                if self.extremum_type == ExtremumType.MIN:
                     result *= -1
                 basis = self.generate_basis_output(new_st)
                 return result, basis
@@ -167,9 +161,9 @@ class SymplexLogic:
 
             support_element = None
 
-            if solution_type == SolutionType.AUTO:
+            if self.solution_type == SolutionType.AUTO:
                 support_element = sorted_available_support_elements[0]
-            elif solution_type == SolutionType.MANUAL:
+            elif self.solution_type == SolutionType.MANUAL:
                 print('Выберите опорный элемент:')
                 for el in sorted_available_support_elements:
                     print(el[0], f'Строка: {el[-2]}', f'Столбец: {el[-1]}')
@@ -241,7 +235,55 @@ class SymplexLogic:
                         # print(f'{old} -> {new_st[row_index][col_index]}')
                         # input()
 
-            self.steps.append(new_st)
+            self.steps[1].append(new_st)
+
+    def solve_task(self, task_matrix, extremum_type, solution_type):
+        self.extremum_type = extremum_type
+        self.solution_type = solution_type
+
+        initial_symplex_table = None
+
+        basis_vars = []
+        for i in range(len(task_matrix[-1])):
+            if task_matrix[-1][i] == Fraction(1):
+                basis_vars.append(i)
+
+        if len(basis_vars) == len(task_matrix) - 2:
+            input_gauss_matrix = []
+            for task_row in range(1, len(task_matrix) - 1):
+                new_row = []
+                for item in task_matrix[task_row]:
+                    new_row.append(item)
+                input_gauss_matrix.append(new_row)
+
+            gauss_result = self.gauss_method(input_gauss_matrix, basis_vars)
+
+            reduced_function = self.reduce_function(task_matrix[0], gauss_result, task_matrix[-1], extremum_type)
+
+            initial_symplex_table = self.get_initial_symplex_table(reduced_function, gauss_result, task_matrix[-1], extremum_type)
+        elif sum(task_matrix[-1]) == Fraction(0):
+            print('Метод искуственного базиса!')
+
+            initial_artificial_table = self.artificial_basis_method(task_matrix)
+
+        else:
+            print('Ошибка! Кол-во выбранных базисных переменных != кол-ву ограничений!')
+            return None
+        #
+        # self.steps[1] = [initial_symplex_table]
+        #
+        # symplex_result = self.symplex_method()
+        #
+        # return symplex_result
+
+    def artificial_basis_method(self, task_matrix):
+        ar_table = []
+
+        new_vars = []
+        # Добавляем доп переменные
+        for _ in range(1, len(task_matrix) - 1):
+            new_vars.append(Fraction(0))
+        print(new_vars)
 
 
     def generate_basis_output(self, st):
@@ -253,4 +295,3 @@ class SymplexLogic:
                 var_index += literals[i]
             basis_arr[int(var_index)-1] = st[row_index][-1]
         return basis_arr
-
