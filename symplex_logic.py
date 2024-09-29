@@ -1,6 +1,8 @@
+from array import ArrayType
 from fractions import Fraction
 
-from task_config import ExtremumType
+from task_config import ExtremumType, SolutionType
+
 
 class SymplexStep:
     def __init__(self):
@@ -87,7 +89,7 @@ class SymplexLogic:
             else:
                 basis_indexes.append(i)
 
-        first_symplex_row = ['x0']
+        first_symplex_row = ['x(0)']
         for not_basis_index in not_basis_indexes:
             first_symplex_row.append(f'x{not_basis_index + 1}')
 
@@ -110,26 +112,145 @@ class SymplexLogic:
 
         return symplex_table
 
-    def solve_task(self, symplex_table, extremum_type):
-        # Сначала находим опорные элементы
+    def artificial_basis_method(self):
+        pass
 
-        # {'Столбец': '<Значение>'}
-        available_col_coeffs = {}
-        for i in range(1, len(symplex_table[-1]) - 1):
-            available_col_coeffs[i] = symplex_table[-1][i]
-        sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
+    # st = symplex_table
+    def solve_task(self, st, extremum_type, solution_type):
+        self.steps = [st]
 
-        available_support_elements = []
-        for col_index in sorted_available_col_coeffs.keys():
-            for row_index in range(1, len(symplex_table) - 1):
-                if symplex_table[row_index][col_index] > 0:
-                    new_support_element = symplex_table[row_index][col_index]
-                    simplex_relation = symplex_table[row_index][-1] / symplex_table[row_index][col_index]
-                    available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
-        sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
 
-        if len(sorted_available_support_elements) != 0:
-            print('Наилучший опорный элемент')
-            print(sorted_available_support_elements[0])
-        else:
-            print('Опорные элементы отсутсвуют')
+
+        while True:
+            old_st = self.steps[-1]
+            new_st = []
+
+            # Делаем глубокую копию последней симплекс-таблицы
+            print('Симплекс-таблица:')
+            for row in old_st:
+                new_st_row = []
+                for el in row:
+                    new_st_row.append(el)
+                new_st.append(new_st_row)
+                print(*new_st_row)
+            print()
+
+            # {'Столбец': '<Значение>'}
+            available_col_coeffs = {}
+            for i in range(1, len(new_st[-1]) - 1):
+                if new_st[-1][i] < 0:
+                    available_col_coeffs[i] = new_st[-1][i]
+            sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
+
+            if len(sorted_available_col_coeffs) == 0:
+                print('Нет доступных столбцов для выбора, симплекс метод закончен!\n')
+                result = new_st[-1][-1]
+                if extremum_type == ExtremumType.MIN:
+                    result *= -1
+                basis = self.generate_basis_output(new_st)
+                return result, basis
+
+            available_support_elements = []
+            for col_index in sorted_available_col_coeffs.keys():
+                for row_index in range(1, len(new_st) - 1):
+                    if new_st[row_index][col_index] > 0:
+                        new_support_element = new_st[row_index][col_index]
+                        simplex_relation = new_st[row_index][-1] / new_st[row_index][col_index]
+                        available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
+
+            sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
+
+            # Если опорных элементов нет
+            if len(sorted_available_support_elements) == 0:
+                print('Нет доступных строк для выбора, функция не ограничена снизу!')
+                return None
+
+            support_element = None
+
+            if solution_type == SolutionType.AUTO:
+                support_element = sorted_available_support_elements[0]
+            elif solution_type == SolutionType.MANUAL:
+                print('Выберите опорный элемент:')
+                for el in sorted_available_support_elements:
+                    print(el[0], f'Строка: {el[-2]}', f'Столбец: {el[-1]}')
+
+                s_el_address = input('\nВведите строку и стобец опорного элемента, ex: "2 1" (Enter для выбора наилучшего): ')
+
+                if s_el_address == '':
+                    support_element = sorted_available_support_elements[0]
+                else:
+                    s_el_address = [int(_) for _ in s_el_address.split(' ')]
+                    for el in sorted_available_support_elements:
+                        if s_el_address == [el[-2], el[-1]]:
+                            support_element = el
+                            break
+                    if support_element is None:
+                        support_element = sorted_available_support_elements[0]
+
+            if support_element is None:
+                return None
+
+            print(f'Выбран: {str(support_element)}\n')
+
+            support_el_value = support_element[0]
+            support_col_index = support_element[-1]
+            support_row_index = support_element[-2]
+
+            # Нулевой шаг симплекс метода
+            # Xi -> Xi+1
+            symplex_table_title = [_ for _ in new_st[0][0]]
+            left_bracket_index = symplex_table_title.index('(')
+            right_bracket_index = symplex_table_title.index(')')
+            symplex_table_title = [symplex_table_title[i] for i in range(left_bracket_index + 1, right_bracket_index)]
+            new_symplex_table_title = ''
+            for el in symplex_table_title:
+                new_symplex_table_title += el
+            new_symplex_table_title = int(new_symplex_table_title)
+            new_st[0][0] = f'x({new_symplex_table_title + 1})'
+
+            # Первый шаг симплекс метода
+            # Xr <-> Xs
+            buffer = new_st[support_row_index][0]
+            new_st[support_row_index][0] = new_st[0][support_col_index]
+            new_st[0][support_col_index] = buffer
+
+            # Второй шаг симплекс метода
+            # Asr^(1) = 1 / Ars^(0)
+            new_st[support_row_index][support_col_index] = 1 / new_st[support_row_index][support_col_index]
+
+            # Третий шаг симплекс метода
+            # ROWs^(1) = 1 / Ars^(0) * ROWr^(0)
+            for col_index in range(1, len(new_st[support_row_index])):
+                if col_index != support_col_index:
+                    new_st[support_row_index][col_index] = 1 / support_el_value * old_st[support_row_index][col_index]
+
+            # Четвёртый шаг симплекс метода
+            # COLr^(1) = - 1 / Ars^(0) * COLs^(0)
+            for row_index in range(1, len(new_st)):
+                if row_index != support_row_index:
+                    new_st[row_index][support_col_index] = -1 / support_el_value * new_st[row_index][support_col_index]
+
+            # Пятый шаг симплекс метода
+            # i != s: ROWi^(1) = ROWi^(0) - Ais * ROWs^(1)
+            for row_index in range(1, len(new_st)):
+                for col_index in range(1, len(new_st[row_index])):
+                    if row_index != support_row_index and col_index != support_col_index:
+                        new_st[row_index][col_index] = old_st[row_index][col_index] - old_st[row_index][support_col_index] * new_st[support_row_index][col_index]
+                        # old = st[row_index][col_index]
+                        # print(f'{old_st[row_index][col_index]} - {old_st[row_index][support_col_index]} * {new_st[support_row_index][col_index]}')
+                        # print(f'{old} -> {new_st[row_index][col_index]}')
+                        # input()
+
+            self.steps.append(new_st)
+
+
+    def generate_basis_output(self, st):
+        basis_arr = [Fraction(0)] * ((len(st) - 2) + (len(st[0]) - 1))
+        for row_index in range(1, len(st) - 1):
+            literals = [i for i in st[row_index][0]]
+            var_index = ''
+            for i in range(1, len(literals)):
+                var_index += literals[i]
+            basis_arr[int(var_index)-1] = st[row_index][-1]
+        return basis_arr
+
