@@ -6,11 +6,10 @@ from task_config import ExtremumType, SolutionType
 symplex_logic_instance = SymplexLogic()
 
 task_matrix = [
-    # 4.12 Иск базис [min]
-        [-1, -4, -1],
-        [1, -1, 1, 3],
-        [2, -5, -1, 0],
-        [0, 0, 0]
+    [-1,-1,-1,-1],
+    [1,0,3,4,5],
+    [0,1,4,3,'9/2'],
+    [0, 0, 0, 0]
 ]
 task_extremum_type = ExtremumType.MIN
 task_solution_type = SolutionType.AUTO
