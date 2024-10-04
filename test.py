@@ -95,3 +95,7 @@ from task_config import ExtremumType
 # [1, -1, 2, 0, 1, 0, 0],
 # [16, -16, 8, 7, 4, 5, 12],
 # [0, 0, 0, 0, 0, 0]
+
+available_support_elements = []
+sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
+print(sorted_available_support_elements)

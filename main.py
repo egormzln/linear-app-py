@@ -101,6 +101,7 @@ class LinearApp(QMainWindow):
                                           extremum_type=self.task_config.solution_type)
             self.new_window.close()
             self._open_result_dialog()
+
         elif self.task_config.solution_type == SolutionType.MANUAL:
             self.new_window.close()
 
@@ -109,11 +110,18 @@ class LinearApp(QMainWindow):
             self.ui_window.setupUi(self.new_window)
             self.new_window.show()
 
-            self.matrix_model = SolveModel(var_count=self.task_config.var_count,
-                                           limits_count=self.task_config.limits_count,
-                                           symplex_logic=self.symplex_logic,
-                                           task_config=self.task_config)
-            self.ui_window.task_matrix.setModel(self.matrix_model)
+            self.solve_model = SolveModel(task_config=self.task_config, symplex_logic=self.symplex_logic)
+            self.ui_window.task_matrix.setModel(self.solve_model)
+            self.ui_window.task_matrix.clicked.connect(self._support_element_click)
+
+    def _support_element_click(self, index):
+        selected_support_element = (index.row(), index.column())
+        if index.isValid():
+            if self.solve_model.check_table_element(index):
+                print(f"Clicked on: {selected_support_element}")
+                self.solve_model.next_step(selected_support_element)
+        else:
+            print("Invalid index clicked.")
 
     def _open_result_dialog(self):
         self.new_window = QtWidgets.QDialog()

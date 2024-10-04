@@ -2,19 +2,6 @@ from array import ArrayType
 from fractions import Fraction
 from task_config import ExtremumType, SolutionType
 
-
-class SymplexStep:
-    def __init__(self):
-        self.matrix = []
-        self.support_element = None
-        self.available_support_elements = []
-
-class ArtificialBasisStep:
-    def __init__(self):
-        self.matrix = []
-        self.support_element = None
-        self.available_support_elements = []
-
 class Result:
     def __init__(self):
         self.function_result = None
@@ -93,7 +80,19 @@ class SymplexLogic:
         # Возвращаем уменьшенную функцию
         return new_function
 
-    def get_initial_symplex_table(self, reduced_function, gauss_matrix, basis, extremum_type):
+    def get_initial_symplex_table(self, task_matrix, basis_vars, extremum_type):
+        input_gauss_matrix = []
+        basis = task_matrix[-1]
+        for task_row in range(1, len(task_matrix) - 1):
+            new_row = []
+            for item in task_matrix[task_row]:
+                new_row.append(item)
+            input_gauss_matrix.append(new_row)
+
+        gauss_result = self.gauss_method(input_gauss_matrix, basis_vars)
+
+        reduced_function = self.reduce_function(task_matrix[0], gauss_result, basis, extremum_type)
+
         symplex_table = []
 
         # Определяем индексы оставшихся переменных (не базисных)
@@ -115,8 +114,8 @@ class SymplexLogic:
         for basis_index in basis_indexes:
             new_symplex_row = [f'x{basis_index + 1}']
             for not_basis_index in not_basis_indexes:
-                new_symplex_row.append(gauss_matrix[gauss_row][not_basis_index])
-            new_symplex_row.append(gauss_matrix[gauss_row][-1])
+                new_symplex_row.append(gauss_result[gauss_row][not_basis_index])
+            new_symplex_row.append(gauss_result[gauss_row][-1])
             gauss_row += 1
             symplex_table.append(new_symplex_row)
 
@@ -128,127 +127,152 @@ class SymplexLogic:
 
         return symplex_table
 
-    def symplex_method(self):
-        while True:
-            old_st = self.steps[1][-1]
-            new_st = []
+    def get_available_support_elements(self, table):
+        # {'Столбец': '<Значение>'}
+        available_col_coeffs = {}
+        for i in range(1, len(table[-1]) - 1):
+            if table[-1][i] < 0:
+                available_col_coeffs[i] = table[-1][i]
 
-            # Делаем глубокую копию последней симплекс-таблицы
-            for row in old_st:
-                new_st_row = []
-                for el in row:
-                    new_st_row.append(el)
-                new_st.append(new_st_row)
-                print(*new_st_row)
-            print()
+        # Сортиурем столбцы по минимальному значению
+        sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
 
-            # {'Столбец': '<Значение>'}
-            available_col_coeffs = {}
-            for i in range(1, len(new_st[-1]) - 1):
-                if new_st[-1][i] < 0:
-                    available_col_coeffs[i] = new_st[-1][i]
-            sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
+        available_support_elements = []
+        for col_index in sorted_available_col_coeffs.keys():
+            for row_index in range(1, len(table) - 1):
+                if table[row_index][col_index] > 0:
+                    new_support_element = table[row_index][col_index]
+                    simplex_relation = table[row_index][-1] / table[row_index][col_index]
+                    available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
 
-            if len(sorted_available_col_coeffs) == 0:
-                print('Нет доступных столбцов для выбора, симплекс-метод закончен!\n')
-                result = new_st[-1][-1]
-                if self.extremum_type == ExtremumType.MIN:
-                    result *= -1
-                basis = self.generate_basis_output(new_st)
-                return result, basis
+        # Сортиурем эл-ты по симплексному отношению
+        sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
 
-            available_support_elements = []
-            for col_index in sorted_available_col_coeffs.keys():
-                for row_index in range(1, len(new_st) - 1):
-                    if new_st[row_index][col_index] > 0:
-                        new_support_element = new_st[row_index][col_index]
-                        simplex_relation = new_st[row_index][-1] / new_st[row_index][col_index]
-                        available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
+        return sorted_available_support_elements
 
-            sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
 
-            # Если опорных элементов нет
-            if len(sorted_available_support_elements) == 0:
-                print('Нет доступных строк для выбора, функция не ограничена снизу!')
-                return None
+    # [ Алгоритм симплекс метода ]
+    # Возварщает новую симплекс таблицу, на основе старой.
+    #
+    # Пример работы:
+    # while True
+    #   new_step = self.symplex_step(steps[-1])
+    #   steps.append(new_step)
+    # print(steps)
+    def symplex_step(self, old_symplex_table, selected_support_element=None):
+        old_st = old_symplex_table
+        new_st = []
 
-            support_element = None
+        # Делаем глубокую копию последней симплекс-таблицы
+        for row in old_st:
+            new_st_row = []
+            for el in row:
+                new_st_row.append(el)
+            new_st.append(new_st_row)
+            print(*new_st_row)
+        print()
 
-            if self.solution_type == SolutionType.AUTO:
-                support_element = sorted_available_support_elements[0]
-            elif self.solution_type == SolutionType.MANUAL:
-                print('Выберите опорный элемент:')
-                for el in sorted_available_support_elements:
-                    print(f'{el[0]} c отношением {el[1]} (столбец: {el[-1]}, cтрока: {el[-2]})')
+        # {'Столбец': '<Значение>'}
+        available_col_coeffs = {}
+        for i in range(1, len(new_st[-1]) - 1):
+            if new_st[-1][i] < 0:
+                available_col_coeffs[i] = new_st[-1][i]
 
-                s_el_address = input('\nВведите столбец и строку опорного элемента, ex: "1 2" (Enter для выбора наилучшего): ')
+        # Сортиурем столбцы по минимальному значению
+        sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
 
-                if s_el_address == '':
-                    support_element = sorted_available_support_elements[0]
-                else:
-                    s_el_address = [int(_) for _ in s_el_address.split(' ')]
-                    for el in sorted_available_support_elements:
-                        if s_el_address == [el[-1], el[-2]]:
-                            support_element = el
-                            break
-                    if support_element is None:
-                        support_element = sorted_available_support_elements[0]
+        if len(sorted_available_col_coeffs) == 0:
+            print('Нет доступных столбцов для выбора, симплекс-метод закончен!\n')
 
+            result = new_st[-1][-1]
+            if self.extremum_type == ExtremumType.MIN:
+                result *= -1
+            basis = self.generate_basis_output(new_st)
+
+            return result, basis
+
+        available_support_elements = []
+        for col_index in sorted_available_col_coeffs.keys():
+            for row_index in range(1, len(new_st) - 1):
+                if new_st[row_index][col_index] > 0:
+                    new_support_element = new_st[row_index][col_index]
+                    simplex_relation = new_st[row_index][-1] / new_st[row_index][col_index]
+                    available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
+
+        sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
+
+        # Если опорных элементов нет
+        if len(sorted_available_support_elements) == 0:
+            print('Нет доступных строк для выбора, функция не ограничена снизу!')
+            return None
+
+        support_element = None
+
+        if self.solution_type == SolutionType.AUTO:
+            support_element = sorted_available_support_elements[0]
+        elif self.solution_type == SolutionType.MANUAL and selected_support_element is not None:
+            for el in sorted_available_support_elements:
+                if selected_support_element == [el[-1], el[-2]]:
+                    support_element = el
+                    break
             if support_element is None:
-                return None
+                support_element = sorted_available_support_elements[0]
 
-            print(f'Выбран элемент {str(support_element[0])} с отношением {str(support_element[1])} (столбец: {str(support_element[-1])}, строка: {str(support_element[-2])})\n')
+        if support_element is None:
+            return None
 
-            support_el_value = support_element[0]
-            support_col_index = support_element[-1]
-            support_row_index = support_element[-2]
+        print(f'Выбран элемент {str(support_element[0])} с отношением {str(support_element[1])} (столбец: {str(support_element[-1])}, строка: {str(support_element[-2])})\n')
 
-            # Нулевой шаг симплекс метода
-            # Xi -> Xi+1
-            symplex_table_title = [_ for _ in new_st[0][0]]
-            left_bracket_index = symplex_table_title.index('(')
-            right_bracket_index = symplex_table_title.index(')')
-            symplex_table_title = [symplex_table_title[i] for i in range(left_bracket_index + 1, right_bracket_index)]
-            new_symplex_table_title = ''
-            for el in symplex_table_title:
-                new_symplex_table_title += el
-            new_symplex_table_title = int(new_symplex_table_title)
-            new_st[0][0] = f'x({new_symplex_table_title + 1})'
+        support_el_value = support_element[0]
+        support_col_index = support_element[-1]
+        support_row_index = support_element[-2]
 
-            # Первый шаг симплекс метода
-            # Xr <-> Xs
-            buffer = new_st[support_row_index][0]
-            new_st[support_row_index][0] = new_st[0][support_col_index]
-            new_st[0][support_col_index] = buffer
+        # Нулевой шаг симплекс метода
+        # Xi -> Xi+1
+        symplex_table_title = [_ for _ in new_st[0][0]]
+        left_bracket_index = symplex_table_title.index('(')
+        right_bracket_index = symplex_table_title.index(')')
+        symplex_table_title = [symplex_table_title[i] for i in range(left_bracket_index + 1, right_bracket_index)]
+        new_symplex_table_title = ''
+        for el in symplex_table_title:
+            new_symplex_table_title += el
+        new_symplex_table_title = int(new_symplex_table_title)
+        new_st[0][0] = f'x({new_symplex_table_title + 1})'
 
-            # Второй шаг симплекс метода
-            # Asr^(1) = 1 / Ars^(0)
-            new_st[support_row_index][support_col_index] = 1 / new_st[support_row_index][support_col_index]
+        # Первый шаг симплекс метода
+        # Xr <-> Xs
+        buffer = new_st[support_row_index][0]
+        new_st[support_row_index][0] = new_st[0][support_col_index]
+        new_st[0][support_col_index] = buffer
 
-            # Третий шаг симплекс метода
-            # ROWs^(1) = 1 / Ars^(0) * ROWr^(0)
-            for col_index in range(1, len(new_st[support_row_index])):
-                if col_index != support_col_index:
-                    new_st[support_row_index][col_index] = 1 / support_el_value * old_st[support_row_index][col_index]
+        # Второй шаг симплекс метода
+        # Asr^(1) = 1 / Ars^(0)
+        new_st[support_row_index][support_col_index] = 1 / new_st[support_row_index][support_col_index]
 
-            # Четвёртый шаг симплекс метода
-            # COLr^(1) = - 1 / Ars^(0) * COLs^(0)
-            for row_index in range(1, len(new_st)):
-                if row_index != support_row_index:
-                    new_st[row_index][support_col_index] = -1 / support_el_value * new_st[row_index][support_col_index]
+        # Третий шаг симплекс метода
+        # ROWs^(1) = 1 / Ars^(0) * ROWr^(0)
+        for col_index in range(1, len(new_st[support_row_index])):
+            if col_index != support_col_index:
+                new_st[support_row_index][col_index] = 1 / support_el_value * old_st[support_row_index][col_index]
 
-            # Пятый шаг симплекс метода
-            # i != s: ROWi^(1) = ROWi^(0) - Ais * ROWs^(1)
-            for row_index in range(1, len(new_st)):
-                for col_index in range(1, len(new_st[row_index])):
-                    if row_index != support_row_index and col_index != support_col_index:
-                        new_st[row_index][col_index] = old_st[row_index][col_index] - old_st[row_index][support_col_index] * new_st[support_row_index][col_index]
-                        # old = st[row_index][col_index]
-                        # print(f'{old_st[row_index][col_index]} - {old_st[row_index][support_col_index]} * {new_st[support_row_index][col_index]}')
-                        # print(f'{old} -> {new_st[row_index][col_index]}')
-                        # input()
+        # Четвёртый шаг симплекс метода
+        # COLr^(1) = - 1 / Ars^(0) * COLs^(0)
+        for row_index in range(1, len(new_st)):
+            if row_index != support_row_index:
+                new_st[row_index][support_col_index] = -1 / support_el_value * new_st[row_index][support_col_index]
 
-            self.steps[1].append(new_st)
+        # Пятый шаг симплекс метода
+        # i != s: ROWi^(1) = ROWi^(0) - Ais * ROWs^(1)
+        for row_index in range(1, len(new_st)):
+            for col_index in range(1, len(new_st[row_index])):
+                if row_index != support_row_index and col_index != support_col_index:
+                    new_st[row_index][col_index] = old_st[row_index][col_index] - old_st[row_index][support_col_index] * new_st[support_row_index][col_index]
+                    # old = st[row_index][col_index]
+                    # print(f'{old_st[row_index][col_index]} - {old_st[row_index][support_col_index]} * {new_st[support_row_index][col_index]}')
+                    # print(f'{old} -> {new_st[row_index][col_index]}')
+                    # input()
+
+        return new_st
 
     def get_init_artificial_basis_table(self, task_matrix):
         # Добавляем шапку таблицы
@@ -287,40 +311,49 @@ class SymplexLogic:
             basis_arr[int(var_index)-1] = st[row_index][-1]
         return basis_arr
 
+    def get_basis_vars(self, task_matrix):
+        basis_vars = []
+        for i in range(len(task_matrix[-1])):
+            if task_matrix[-1][i] == Fraction(1):
+                basis_vars.append(i)
+        return basis_vars
+
     def solve_task(self, task_matrix, extremum_type, solution_type):
         self.extremum_type = extremum_type
         self.solution_type = solution_type
 
         initial_symplex_table = None
 
-        basis_vars = []
-        for i in range(len(task_matrix[-1])):
-            if task_matrix[-1][i] == Fraction(1):
-                basis_vars.append(i)
+        basis_vars = self.get_basis_vars(task_matrix)
 
         if len(basis_vars) == len(task_matrix) - 2:
-            input_gauss_matrix = []
-            for task_row in range(1, len(task_matrix) - 1):
-                new_row = []
-                for item in task_matrix[task_row]:
-                    new_row.append(item)
-                input_gauss_matrix.append(new_row)
+            # input_gauss_matrix = []
+            # for task_row in range(1, len(task_matrix) - 1):
+            #     new_row = []
+            #     for item in task_matrix[task_row]:
+            #         new_row.append(item)
+            #     input_gauss_matrix.append(new_row)
+            #
+            # gauss_result = self.gauss_method(input_gauss_matrix, basis_vars)
+            #
+            # reduced_function = self.reduce_function(task_matrix[0], gauss_result, task_matrix[-1], extremum_type)
 
-            gauss_result = self.gauss_method(input_gauss_matrix, basis_vars)
-
-            reduced_function = self.reduce_function(task_matrix[0], gauss_result, task_matrix[-1], extremum_type)
-
-            initial_symplex_table = self.get_initial_symplex_table(reduced_function, gauss_result, task_matrix[-1], extremum_type)
+            initial_symplex_table = self.get_initial_symplex_table(task_matrix, basis_vars, extremum_type)
 
             self.steps[1] = [initial_symplex_table]
 
-            symplex_result = self.symplex_method()
+            while True:
+                symplex_result = self.symplex_step(self.steps[1][-1])
+                if isinstance(symplex_result, list):
+                    self.steps[1].append(symplex_result)
+                elif isinstance(symplex_result, tuple):
+                    self.result.function_result = symplex_result[0]
+                    self.result.basis_result = symplex_result[1]
+                    self.result.comment = "Задача успешно решена!"
 
-            self.result.function_result = symplex_result[0]
-            self.result.basis_result = symplex_result[1]
-            self.result.comment = "Задача успешно решена!"
-
-            return symplex_result
+                    return symplex_result
+                elif symplex_result is None:
+                    return symplex_result
 
         elif sum(task_matrix[-1]) == Fraction(0):
             print('Метод искуственного базиса!\n')
@@ -344,13 +377,18 @@ class SymplexLogic:
 
                 print('Симплекс метод!\n')
 
-                symplex_result = self.symplex_method()
+                while True:
+                    symplex_result = self.symplex_step(self.steps[1][-1])
+                    if isinstance(symplex_result, list):
+                        self.steps[1].append(symplex_result)
+                    elif isinstance(symplex_result, tuple):
+                        self.result.function_result = symplex_result[0]
+                        self.result.basis_result = symplex_result[1]
+                        self.result.comment = "Задача успешно решена!"
 
-                self.result.function_result = symplex_result[0]
-                self.result.basis_result = symplex_result[1]
-                self.result.comment = "Задача успешно решена!"
-
-                return symplex_result
+                        return symplex_result
+                    elif symplex_result is None:
+                        return symplex_result
             else:
                 print('Ошибка во время выполнения метода иск базиса!')
                 return None
