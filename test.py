@@ -3,6 +3,7 @@
 # [1,  2,  5,-1, 4],
 # [1, -1, -1, 2, 1],
 # [0, 0, 1, 1]
+from enum import Enum
 from fractions import Fraction
 
 from symplex_logic import SymplexLogic

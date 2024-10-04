@@ -12,7 +12,7 @@ task_matrix = [
     [0, 0, 0, 0]
 ]
 task_extremum_type = ExtremumType.MIN
-task_solution_type = SolutionType.AUTO
+task_solution_type = SolutionType.MANUAL
 
 task_matrix = [[Fraction(element) for element in row] for row in task_matrix]
 

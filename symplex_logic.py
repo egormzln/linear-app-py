@@ -1,14 +1,25 @@
 from array import ArrayType
 from fractions import Fraction
-
 from task_config import ExtremumType, SolutionType
 
 
 class SymplexStep:
     def __init__(self):
         self.matrix = []
-        self.support_element = []
+        self.support_element = None
         self.available_support_elements = []
+
+class ArtificialBasisStep:
+    def __init__(self):
+        self.matrix = []
+        self.support_element = None
+        self.available_support_elements = []
+
+class Result:
+    def __init__(self):
+        self.function_result = None
+        self.basis_result = None
+        self.comment = None
 
 class SymplexLogic:
     def __init__(self):
@@ -16,6 +27,7 @@ class SymplexLogic:
         self.extremum_type = None
         # [ <массив шагов иск-го базиса>, <массив шагов симплекса>]
         self.steps = [[], []]
+        self.result = Result()
 
     def gauss_method(self, matrix, target_columns):
         rows = len(matrix)
@@ -28,7 +40,8 @@ class SymplexLogic:
 
             # Делим все оставшиеся элементы строки, чтобы привести элемент к 1
             for j in range(num_columns):
-                matrix[row_index][j] /= pivot
+                if pivot != Fraction(0):
+                    matrix[row_index][j] /= pivot
 
             # Длаее для каждой строки (без pivot)
             for target_row in range(rows):
@@ -303,7 +316,12 @@ class SymplexLogic:
 
             symplex_result = self.symplex_method()
 
+            self.result.function_result = symplex_result[0]
+            self.result.basis_result = symplex_result[1]
+            self.result.comment = "Задача успешно решена!"
+
             return symplex_result
+
         elif sum(task_matrix[-1]) == Fraction(0):
             print('Метод искуственного базиса!\n')
             initial_artificial_basis_table = self.get_init_artificial_basis_table(task_matrix)
@@ -327,6 +345,10 @@ class SymplexLogic:
                 print('Симплекс метод!\n')
 
                 symplex_result = self.symplex_method()
+
+                self.result.function_result = symplex_result[0]
+                self.result.basis_result = symplex_result[1]
+                self.result.comment = "Задача успешно решена!"
 
                 return symplex_result
             else:
@@ -355,7 +377,6 @@ class SymplexLogic:
         s_t[-1].append(reduced_function[-1] * -1)
 
         return s_t
-
 
     def artificial_basis_method(self):
         while True:
