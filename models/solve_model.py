@@ -7,16 +7,16 @@ from test import available_support_elements
 
 
 class SymplexStep:
-    def __init__(self, table, available_support_elements):
+    def __init__(self, table, available_support_elements, is_finished=False):
         self.table = table
         self.available_support_elements = available_support_elements
-        self.is_finished = False
+        self.is_finished = is_finished
 
 class ArtificialBasisStep:
-    def __init__(self, table, available_support_elements):
+    def __init__(self, table, available_support_elements, is_finished=False):
         self.table = table
         self.available_support_elements = available_support_elements
-        self.is_finished = False
+        self.is_finished = is_finished
 
 
 class SolveModel(QtCore.QAbstractTableModel):
@@ -61,23 +61,45 @@ class SolveModel(QtCore.QAbstractTableModel):
         last_step = self.steps[-1]
         if not last_step.is_finished:
             next_step_result = None
-            if last_step is SymplexStep:
-                next_step_result = self.symplex_logic.symplex_step(last_step, selected_support_element)
-            # elif last_step is ArtificialBasisStep:
-                # next_step_result = self.symplex_logic.artificial_basis_method(last_step, selected_support_element)
-
-            # if isinstance(next_step_result, list):
-            #
-            #     self.steps.append(
-            # elif isinstance(symplex_result, tuple):
-            #     self.result.function_result = symplex_result[0]
-            #     self.result.basis_result = symplex_result[1]
-            #     self.result.comment = "Задача успешно решена!"
-            #
-            #     return symplex_result
-            # elif symplex_result is None:
-            #     return symplex_result
-            #
+            if isinstance(last_step, SymplexStep):
+                next_step_result = self.symplex_logic.symplex_step(last_step.table, selected_support_element)
+                if isinstance(next_step_result, list):
+                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                    self.steps.append(
+                        SymplexStep(
+                            table=next_step_result,
+                            available_support_elements=available_support_elements
+                        )
+                    )
+                elif isinstance(next_step_result, tuple):
+                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                    self.steps.append(
+                        SymplexStep(
+                            table=next_step_result,
+                            available_support_elements=available_support_elements,
+                            is_finished=True
+                        )
+                    )
+            elif isinstance(last_step, ArtificialBasisStep):
+                next_step_result = self.symplex_logic.symplex_step(last_step.table, selected_support_element, True)
+                if isinstance(next_step_result, list):
+                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                    self.steps.append(
+                        ArtificialBasisStep(
+                            table=next_step_result,
+                            available_support_elements=available_support_elements
+                        )
+                    )
+                elif isinstance(next_step_result, tuple):
+                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                    self.steps.append(
+                        ArtificialBasisStep(
+                            table=next_step_result,
+                            available_support_elements=available_support_elements,
+                            is_finished=True
+                        )
+                    )
+        self.layoutChanged.emit()
 
 
     def data(self, index: QtCore.QModelIndex, role: QtCore.Qt.ItemDataRole):

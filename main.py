@@ -96,6 +96,7 @@ class LinearApp(QMainWindow):
 
     def open_solve_dialog(self):
         if self.task_config.solution_type == SolutionType.AUTO:
+            self.symplex_logic.solution_type = self.task_config.solution_type
             self.symplex_logic.solve_task(task_matrix=self.task_config.input_matrix,
                                           solution_type=self.task_config.solution_type,
                                           extremum_type=self.task_config.solution_type)
@@ -103,6 +104,8 @@ class LinearApp(QMainWindow):
             self._open_result_dialog()
 
         elif self.task_config.solution_type == SolutionType.MANUAL:
+            self.symplex_logic.solution_type = self.task_config.solution_type
+
             self.new_window.close()
 
             self.new_window = QtWidgets.QDialog()
@@ -120,6 +123,7 @@ class LinearApp(QMainWindow):
             if self.solve_model.check_table_element(index):
                 print(f"Clicked on: {selected_support_element}")
                 self.solve_model.next_step(selected_support_element)
+
         else:
             print("Invalid index clicked.")
 

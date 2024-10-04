@@ -159,7 +159,7 @@ class SymplexLogic:
     #   new_step = self.symplex_step(steps[-1])
     #   steps.append(new_step)
     # print(steps)
-    def symplex_step(self, old_symplex_table, selected_support_element=None):
+    def symplex_step(self, old_symplex_table, selected_support_element=None, artificial_basis_method=False):
         old_st = old_symplex_table
         new_st = []
 
@@ -182,6 +182,11 @@ class SymplexLogic:
         sorted_available_col_coeffs = dict(sorted(available_col_coeffs.items(), key=lambda item: item[1]))
 
         if len(sorted_available_col_coeffs) == 0:
+            if artificial_basis_method:
+                # TODO добавить проверку на все нули в строке оценок и реализовать алгоритм холостого шага
+                print('Метод икусственного базиса завершён!')
+                return old_st, True
+
             print('Нет доступных столбцов для выбора, симплекс-метод закончен!\n')
 
             result = new_st[-1][-1]
@@ -212,7 +217,7 @@ class SymplexLogic:
             support_element = sorted_available_support_elements[0]
         elif self.solution_type == SolutionType.MANUAL and selected_support_element is not None:
             for el in sorted_available_support_elements:
-                if selected_support_element == [el[-1], el[-2]]:
+                if selected_support_element == (el[-2], el[-1]):
                     support_element = el
                     break
             if support_element is None:
@@ -229,15 +234,20 @@ class SymplexLogic:
 
         # Нулевой шаг симплекс метода
         # Xi -> Xi+1
-        symplex_table_title = [_ for _ in new_st[0][0]]
-        left_bracket_index = symplex_table_title.index('(')
-        right_bracket_index = symplex_table_title.index(')')
-        symplex_table_title = [symplex_table_title[i] for i in range(left_bracket_index + 1, right_bracket_index)]
-        new_symplex_table_title = ''
-        for el in symplex_table_title:
-            new_symplex_table_title += el
-        new_symplex_table_title = int(new_symplex_table_title)
-        new_st[0][0] = f'x({new_symplex_table_title + 1})'
+        if artificial_basis_method:
+            symplex_table_title = new_st[0][0].split('^')
+            new_symplex_table_title = int(symplex_table_title[1]) + 1
+            new_st[0][0] = f'x^{new_symplex_table_title}'
+        else:
+            symplex_table_title = [_ for _ in new_st[0][0]]
+            left_bracket_index = symplex_table_title.index('(')
+            right_bracket_index = symplex_table_title.index(')')
+            symplex_table_title = [symplex_table_title[i] for i in range(left_bracket_index + 1, right_bracket_index)]
+            new_symplex_table_title = ''
+            for el in symplex_table_title:
+                new_symplex_table_title += el
+            new_symplex_table_title = int(new_symplex_table_title)
+            new_st[0][0] = f'x({new_symplex_table_title + 1})'
 
         # Первый шаг симплекс метода
         # Xr <-> Xs
@@ -271,6 +281,12 @@ class SymplexLogic:
                     # print(f'{old_st[row_index][col_index]} - {old_st[row_index][support_col_index]} * {new_st[support_row_index][col_index]}')
                     # print(f'{old} -> {new_st[row_index][col_index]}')
                     # input()
+
+        if artificial_basis_method:
+            # Доп. шаг метода искусственного базиса
+            # Вырез столбца
+            for row_index in range(len(new_st)):
+                del new_st[row_index][support_col_index]
 
         return new_st
 
@@ -358,8 +374,18 @@ class SymplexLogic:
         elif sum(task_matrix[-1]) == Fraction(0):
             print('Метод искуственного базиса!\n')
             initial_artificial_basis_table = self.get_init_artificial_basis_table(task_matrix)
+
             self.steps[0] = [initial_artificial_basis_table]
-            artificial_basis_result = self.artificial_basis_method()
+
+            artificial_basis_result = None
+
+            while True:
+                artificial_basis_result = self.symplex_step(old_symplex_table=self.steps[0][-1], artificial_basis_method=True)
+                if isinstance(artificial_basis_result, list):
+                    self.steps[0].append(artificial_basis_result)
+                elif isinstance(artificial_basis_result, tuple):
+                    artificial_basis_result = artificial_basis_result[0]
+                    break
 
             if artificial_basis_result is not None:
                 gauss_art_table = self.convert_art_table(task_matrix[0], artificial_basis_result)
@@ -415,124 +441,6 @@ class SymplexLogic:
         s_t[-1].append(reduced_function[-1] * -1)
 
         return s_t
-
-    def artificial_basis_method(self):
-        while True:
-            old_art = self.steps[0][-1]
-            new_art = []
-
-            # Делаем глубокую копию последней таблицы иск базиса
-            for row in old_art:
-                new_art_row = []
-                for el in row:
-                    new_art_row.append(el)
-                new_art.append(new_art_row)
-                print(*new_art_row)
-            print()
-
-            # {'Столбец': '<Значение>'}
-            available_col_coeffs = {}
-            for i in range(1, len(new_art[-1]) - 1):
-                if new_art[-1][i] < Fraction(0):
-                    available_col_coeffs[i] = new_art[-1][i]
-            sorted_available_col_coeffs = available_col_coeffs
-
-            if len(sorted_available_col_coeffs) == 0:
-                # TODO добавить проверку на все нули в строке оценок и реализовать алгоритм холостого шага
-                print('Метод икусственного базиса завершён!')
-                return old_art
-
-            available_support_elements = []
-            for col_index in sorted_available_col_coeffs.keys():
-                for row_index in range(1, len(new_art) - 1):
-                    if new_art[row_index][col_index] > 0:
-                        new_support_element = new_art[row_index][col_index]
-                        simplex_relation = new_art[row_index][-1] / new_art[row_index][col_index]
-                        available_support_elements.append([new_support_element, simplex_relation, row_index, col_index])
-
-            sorted_available_support_elements = sorted(available_support_elements, key=lambda x: x[1])
-
-            # Если опорных элементов нет
-            if len(sorted_available_support_elements) == 0:
-                print('Ошибка! Нет опорных элементов доя метода скусственного базиса!')
-                return None
-
-            support_element = None
-
-            if self.solution_type == SolutionType.AUTO:
-                support_element = sorted_available_support_elements[0]
-            elif self.solution_type == SolutionType.MANUAL:
-                print('Выберите опорный элемент:')
-                for el in sorted_available_support_elements:
-                    print(f'{el[0]} c отношением {el[1]} (столбец: {el[-1]}, cтрока: {el[-2]})')
-
-                s_el_address = input('\nВведите строку и столбец опорного элемента, ex: "2 1" (Enter для выбора наилучшего): ')
-
-                if s_el_address == '':
-                    support_element = sorted_available_support_elements[0]
-                else:
-                    try:
-                        s_el_address = [int(_) for _ in s_el_address.split(' ')]
-                        for el in sorted_available_support_elements:
-                            if s_el_address == [el[-1], el[-2]]:
-                                support_element = el
-                                break
-                        if support_element is None:
-                            support_element = sorted_available_support_elements[0]
-                    except:
-                        support_element = sorted_available_support_elements[0]
-
-
-            if support_element is None:
-                return None
-
-            print(f'Выбран элемент {str(support_element[0])} с отношением {str(support_element[1])} (строка: {str(support_element[-2])}, столбец: {str(support_element[-1])})\n')
-
-            support_el_value = support_element[0]
-            support_col_index = support_element[-1]
-            support_row_index = support_element[-2]
-
-            # Нулевой шаг симплекс метода
-            # Xi -> Xi+1
-            symplex_table_title = new_art[0][0].split('^')
-            new_symplex_table_title = int(symplex_table_title[1]) + 1
-            new_art[0][0] = f'x^{new_symplex_table_title}'
-
-            # Первый шаг симплекс метода
-            # Xr <-> Xs
-            buffer = new_art[support_row_index][0]
-            new_art[support_row_index][0] = new_art[0][support_col_index]
-            new_art[0][support_col_index] = buffer
-
-            # Второй шаг симплекс метода
-            # Asr^(1) = 1 / Ars^(0)
-            new_art[support_row_index][support_col_index] = 1 / new_art[support_row_index][support_col_index]
-
-            # Третий шаг симплекс метода
-            # ROWs^(1) = 1 / Ars^(0) * ROWr^(0)
-            for col_index in range(1, len(new_art[support_row_index])):
-                if col_index != support_col_index:
-                    new_art[support_row_index][col_index] = 1 / support_el_value * old_art[support_row_index][col_index]
-
-            # Четвёртый шаг симплекс метода
-            # COLr^(1) = - 1 / Ars^(0) * COLs^(0)
-            for row_index in range(1, len(new_art)):
-                if row_index != support_row_index:
-                    new_art[row_index][support_col_index] = -1 / support_el_value * new_art[row_index][support_col_index]
-
-            # Пятый шаг симплекс метода
-            # i != s: ROWi^(1) = ROWi^(0) - Ais * ROWs^(1)
-            for row_index in range(1, len(new_art)):
-                for col_index in range(1, len(new_art[row_index])):
-                    if row_index != support_row_index and col_index != support_col_index:
-                        new_art[row_index][col_index] = old_art[row_index][col_index] - old_art[row_index][support_col_index] * new_art[support_row_index][col_index]
-
-
-            # Вырез столбца
-            for row_index in range(len(new_art)):
-                del new_art[row_index][support_col_index]
-
-            self.steps[0].append(new_art)
 
     def convert_art_table(self, function, art_table):
         print('Перестроение таблицы после метода искуственного базиса для минимизации функции...')
