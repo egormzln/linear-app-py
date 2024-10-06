@@ -99,7 +99,7 @@ class LinearApp(QMainWindow):
             self.symplex_logic.solution_type = self.task_config.solution_type
             self.symplex_logic.solve_task(task_matrix=self.task_config.input_matrix,
                                           solution_type=self.task_config.solution_type,
-                                          extremum_type=self.task_config.solution_type)
+                                          extremum_type=self.task_config.extremum_type)
             self.new_window.close()
             self._open_result_dialog()
 
@@ -116,26 +116,34 @@ class LinearApp(QMainWindow):
             self.solve_model = SolveModel(task_config=self.task_config, symplex_logic=self.symplex_logic)
             self.ui_window.task_matrix.setModel(self.solve_model)
             self.ui_window.task_matrix.clicked.connect(self._support_element_click)
+            self.ui_window.btn_step_back.clicked.connect(self._solve_dialog_back_step)
+
 
     def _support_element_click(self, index):
         selected_support_element = (index.row(), index.column())
         if index.isValid():
             if self.solve_model.check_table_element(index):
-                print(f"Clicked on: {selected_support_element}")
+                print(f"Выюран: {selected_support_element}")
                 self.solve_model.next_step(selected_support_element)
+                if self.solve_model.solving_is_ended:
+                    self.ui_window.btn_step_back.setDisabled(True)
+                    self._open_result_dialog()
 
+    def _solve_dialog_back_step(self):
+        if len(self.solve_model.steps) > 1:
+            self.solve_model.back_step()
         else:
-            print("Invalid index clicked.")
+            self.new_window.close()
 
     def _open_result_dialog(self):
-        self.new_window = QtWidgets.QDialog()
-        self.ui_window = Ui_AnswerDialog()
-        self.ui_window.setupUi(self.new_window)
-        self.new_window.show()
+        self.result_dialog = QtWidgets.QDialog()
+        self.ui_result_dialog = Ui_AnswerDialog()
+        self.ui_result_dialog.setupUi(self.result_dialog)
+        self.result_dialog.show()
 
-        self.ui_window.btn_answer_ok.clicked.connect(self.new_window.close)
+        self.ui_result_dialog.btn_answer_ok.clicked.connect(self.new_window.close)
 
-        self.ui_window.lbl_task_status.setText(self.symplex_logic.result.comment)
+        self.ui_result_dialog.lbl_task_status.setText(self.symplex_logic.result.comment)
 
         basis_output = "x* ( "
         for el in self.symplex_logic.result.basis_result:
@@ -153,7 +161,13 @@ class LinearApp(QMainWindow):
 
         result_output = f"{basis_output}\n{function_output}"
 
-        self.ui_window.lbl_answer.setText(result_output)
+        self.ui_result_dialog.lbl_answer.setText(result_output)
+
+        self.ui_result_dialog.btn_answer_ok.clicked.connect(self._result_dialog_ok_click)
+
+    def _result_dialog_ok_click(self):
+        self.result_dialog.close()
+        self.new_window.close()
 
     def open_info_dialog(self):
         self.new_window = QtWidgets.QDialog()
@@ -174,7 +188,6 @@ class LinearApp(QMainWindow):
     def load_from_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Выберите файл задачи", "res/tasks", "Text Files (*.txt)")
 
-        # If a file is selected, print its path
         if file_path:
             try:
                 print(f"Selected file: {file_path}")

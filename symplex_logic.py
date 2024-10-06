@@ -190,7 +190,7 @@ class SymplexLogic:
             print('Нет доступных столбцов для выбора, симплекс-метод закончен!\n')
 
             result = new_st[-1][-1]
-            if self.extremum_type == ExtremumType.MIN:
+            if self.extremum_type == ExtremumType.MIN.name:
                 result *= -1
             basis = self.generate_basis_output(new_st)
 
@@ -459,9 +459,11 @@ class SymplexLogic:
             var = int(''.join(list(art_copy[row_index][0])[1:]))
             basis_vars.append(var)
 
-        for col_index in range(1, len(art_copy[0])):
-            var = int(''.join(list(art_copy[0][col_index])[1:]))
-            not_basis_vars.append(var)
+        # for col_index in range(1, len(art_copy[0])):
+        for i in range(len(function)):
+            el_num = i + 1
+            if el_num not in basis_vars:
+                not_basis_vars.append(el_num)
 
         art_short_matrix = []
         for row_index in range(1, len(art_copy) - 1):
@@ -473,9 +475,9 @@ class SymplexLogic:
         for art_short_row in art_short_matrix:
             basis_var = int(''.join(list(art_short_row[0])[1:]))
 
-            target_row_len = len(basis_vars) + len(not_basis_vars) + 1
+            # target_row_len = len(basis_vars) + len(not_basis_vars) + 1
 
-            gauss_matrix_row = [None] * target_row_len
+            gauss_matrix_row = [None for _ in range(max(basis_vars + not_basis_vars) + 1)]
 
             for i in range(len(art_short_row)):
                 if isinstance(art_short_row[i], str):
@@ -483,7 +485,9 @@ class SymplexLogic:
                     break
 
             for i in range(len(not_basis_vars)):
-                gauss_matrix_row[not_basis_vars[i] - 1] = art_short_row[i]
+                gauss_index = not_basis_vars[i] - 1
+                gauss_value = art_short_row[i]
+                gauss_matrix_row[gauss_index] = gauss_value
 
             gauss_matrix_row[-1] = art_short_row[-1]
 

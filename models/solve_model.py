@@ -2,7 +2,7 @@ from PySide6 import QtCore, QtGui
 from PySide6.QtCore import Qt
 
 from symplex_logic import SymplexLogic
-from task_config import TaskConfig, TypeOfFractions
+from task_config import TaskConfig, TypeOfFractions, ExtremumType
 from test import available_support_elements
 
 
@@ -27,6 +27,7 @@ class SolveModel(QtCore.QAbstractTableModel):
         self.steps = []
         # [ <Метод: 0 - иск базис / 1 - симплекс>, <Индекс шага в методе> ]
         self.current_step_index = 0
+        self.solving_is_ended = False
 
         if len(self.steps) == 0:
             task_matrix = self.task_config.input_matrix
@@ -59,47 +60,85 @@ class SolveModel(QtCore.QAbstractTableModel):
 
     def next_step(self, selected_support_element):
         last_step = self.steps[-1]
-        if not last_step.is_finished:
-            next_step_result = None
-            if isinstance(last_step, SymplexStep):
-                next_step_result = self.symplex_logic.symplex_step(last_step.table, selected_support_element)
-                if isinstance(next_step_result, list):
-                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
-                    self.steps.append(
-                        SymplexStep(
-                            table=next_step_result,
-                            available_support_elements=available_support_elements
-                        )
+        next_step_result = None
+
+        if isinstance(last_step, SymplexStep):
+            next_step_result = self.symplex_logic.symplex_step(last_step.table, selected_support_element)
+            available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+
+            if len(available_support_elements) != 0:
+                self.steps.append(
+                    SymplexStep(
+                        table=next_step_result,
+                        available_support_elements=available_support_elements
                     )
-                elif isinstance(next_step_result, tuple):
-                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
-                    self.steps.append(
-                        SymplexStep(
-                            table=next_step_result,
-                            available_support_elements=available_support_elements,
-                            is_finished=True
-                        )
+                )
+                self.layoutChanged.emit()
+            else:
+                self.steps.append(
+                    SymplexStep(
+                        table=next_step_result,
+                        available_support_elements=available_support_elements,
+                        is_finished=True
                     )
-            elif isinstance(last_step, ArtificialBasisStep):
-                next_step_result = self.symplex_logic.symplex_step(last_step.table, selected_support_element, True)
-                if isinstance(next_step_result, list):
-                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                )
+                result = next_step_result[-1][-1]
+
+                if self.task_config.extremum_type == ExtremumType.MIN.name:
+                    result *= -1
+                basis = self.symplex_logic.generate_basis_output(next_step_result)
+
+                self.symplex_logic.result.function_result = result
+                self.symplex_logic.result.basis_result = basis
+                self.symplex_logic.result.comment = "Задача успешно решена!"
+
+                self.solving_is_ended = True
+
+        elif isinstance(last_step, ArtificialBasisStep):
+            if not last_step.is_finished:
+                next_step_result = self.symplex_logic.symplex_step(
+                    last_step.table,
+                    selected_support_element,
+                    True
+                )
+                available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+
+                if len(available_support_elements) != 0:
                     self.steps.append(
                         ArtificialBasisStep(
                             table=next_step_result,
                             available_support_elements=available_support_elements
                         )
                     )
-                elif isinstance(next_step_result, tuple):
-                    available_support_elements = self.symplex_logic.get_available_support_elements(next_step_result)
+                    self.layoutChanged.emit()
+                else:
+                    gauss_art_table = self.symplex_logic.convert_art_table(self.task_config.input_matrix[0], next_step_result)
+                    reduced_function = self.symplex_logic.reduce_function(
+                        self.task_config.input_matrix[0],
+                        gauss_art_table[0],
+                        gauss_art_table[1],
+                        self.task_config.extremum_type
+                    )
+                    initial_symplex_table = self.symplex_logic.create_initial_symplex_table_for_art(
+                        next_step_result,
+                        reduced_function
+                    )
+                    available_support_elements = self.symplex_logic.get_available_support_elements(initial_symplex_table)
                     self.steps.append(
-                        ArtificialBasisStep(
-                            table=next_step_result,
-                            available_support_elements=available_support_elements,
-                            is_finished=True
+                        SymplexStep(
+                            table=initial_symplex_table,
+                            available_support_elements=available_support_elements
                         )
                     )
-        self.layoutChanged.emit()
+                    self.layoutChanged.emit()
+
+        self.current_step_index += 1
+
+    def _next_step_available(self, table):
+        sup_elements = self.symplex_logic.get_available_support_elements(table)
+
+        if len(sup_elements) == 0:
+            return False
 
 
     def data(self, index: QtCore.QModelIndex, role: QtCore.Qt.ItemDataRole):
@@ -142,7 +181,6 @@ class SolveModel(QtCore.QAbstractTableModel):
         return self.row_count
 
     def flags(self, index):
-
         if self.check_table_element(index):
             return QtCore.Qt.ItemFlag.ItemIsEnabled
         return QtCore.Qt.ItemFlag.NoItemFlags
@@ -156,3 +194,7 @@ class SolveModel(QtCore.QAbstractTableModel):
 
         return (row, col) in available_support_element_tuples
 
+    def back_step(self):
+        self.steps.pop()
+        self.current_step_index -= 1
+        self.layoutChanged.emit()
