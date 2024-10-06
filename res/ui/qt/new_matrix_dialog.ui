@@ -49,6 +49,9 @@
        </item>
        <item>
         <widget class="QPushButton" name="btn_cancel">
+         <property name="focusPolicy">
+          <enum>Qt::FocusPolicy::NoFocus</enum>
+         </property>
          <property name="styleSheet">
           <string notr="true">color: rgb(255, 38, 0);</string>
          </property>
@@ -59,6 +62,9 @@
        </item>
        <item>
         <widget class="QPushButton" name="btn_start_solving">
+         <property name="focusPolicy">
+          <enum>Qt::FocusPolicy::NoFocus</enum>
+         </property>
          <property name="styleSheet">
           <string notr="true"/>
          </property>

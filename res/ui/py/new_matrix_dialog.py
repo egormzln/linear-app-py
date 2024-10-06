@@ -45,12 +45,14 @@ class Ui_TaskInputDialog(object):
 
         self.btn_cancel = QPushButton(TaskInputDialog)
         self.btn_cancel.setObjectName(u"btn_cancel")
+        self.btn_cancel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_cancel.setStyleSheet(u"color: rgb(255, 38, 0);")
 
         self.horizontalLayout.addWidget(self.btn_cancel)
 
         self.btn_start_solving = QPushButton(TaskInputDialog)
         self.btn_start_solving.setObjectName(u"btn_start_solving")
+        self.btn_start_solving.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_start_solving.setStyleSheet(u"")
         self.btn_start_solving.setCheckable(False)
         self.btn_start_solving.setAutoExclusive(False)
